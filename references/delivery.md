@@ -2,13 +2,18 @@
 
 ## 一、交互看板（左列表右详情 + 汇总卡片页 + 图表 + 真实截图）
 
-### 1. 模板复用（每周加速的关键）
-- **复用上周看板 HTML 作为布局模板**：改 `<title>`、头部品牌、GAMES 数组（本期数据）与 assets 素材，保留 CSS/JS 壳不动。
-- 首个规范样例（首期 2026-10 交付物，路径可能随迁移变化，找不到则从数据源报告重建壳）：
-  `E:\doubao\IAA\周榜游戏交互看板\周榜游戏观察看板.html`
-  - 数据结构：`const GAMES = [{id, rank, zh, en, dev, pub, platform, platformLabel, launch, type, rankNow, rankBest, downloads, revenue, rating, intro, monet, score, iaa, dims[13], reasons[13], wishlist, wishlistNote, oneLiner, coreLoop, selling, resources, monetDetail, good[], bad[], tips[], notes[], urls[], icon, shots[]}]`；维度顺序见 `scoring.md`。
+### 1. 模板与构建脚本（布局一致的强制入口）
+- **布局模板固定为仓库 `templates/dashboard-template.html`，每周只跑构建脚本注入数据，禁止手改 CSS/JS 壳**，保证每周看板布局一致（2026-10 用户明确要求，历史教训：自研卡片式布局被质疑与上期不一致）。
+- 构建命令（用法示例）：
+  ```
+  python3 scripts/build_dashboard.py <games.json> <输出.html> -t "YYYY-MM-DD" -d <发布目录> [--insights <本周灵感总结片段.html>] [--watchlist <本周观察项片段.html>]
+  ```
+  - 数据源 `games.json` 结构：`[{id, rank, zh, en, dev, pub, platform, platformLabel, launch, type, rankNow, rankBest, downloads, revenue, rating, intro, monet, score, iaa, dims[13], reasons[13], wishlist, wishlistNote, oneLiner, coreLoop, selling, resources, monetDetail, good[], bad[], tips[], notes[], urls[], icon, shots[]}]`；维度顺序见 `scoring.md`。
+  - 构建脚本按发布目录 `assets/` 实存自动清空 `icon`/`shots`：缺素材渲染渐变字块（不发 `<img>` 请求，避免 404 与 consoleErrors），并生成静态预载块（发布链路静态扫描只认 `<img src>`，JS 拼接路径会漏传裂图）。
+  - 每周内容注入：`--insights`/`--watchlist` 传 HTML 片段（含 h3 小节），替换模板占位符 `__WEEKLY_INSIGHTS__` / `__WEEKLY_WATCHLIST__`。
   - 图标/截图存放：`assets/<游戏id>_icon.<ext>`、`assets/<游戏id>_shotN.<ext>`。
 - 看板功能基线：汇总看板（指标卡 + 4 张 ECharts：综合分排行横条/潜力定位象限散点/平台构成环形/13 维均值横条 + 速览卡片墙（含愿望单热度列） + 灵感总结 + 观察项）+ 游戏图鉴（左列表 + 右详情 hero/画廊/基础信息（含愿望单字段）/13 维条形图/雷达图 + 评分表/深度分析 9 节/来源）。
+- 首个规范样例（首期 2026-10 交付物，路径可能随迁移变化）：`E:\doubao\IAA\周榜游戏交互看板\游戏周榜观察看板.html`。
 
 ### 2. 手机竖屏适配（必须保留）
 - `@media (max-width:640px)` 断点包：`.detail-wrap` 改 `flex-direction:column`；`.list-col` 改 `position:static` + `#game-list` 横向滑动条（`display:flex;overflow-x:auto`，卡片 `min-width:196px`）；`.detail-col`、容器、字号、卡片紧凑化；画廊截图 72% 宽；评分表 11.5px。

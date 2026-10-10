@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>游戏周榜观察 · __WEEK_LABEL__（交互看板）</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232563eb'/%3E%3Ctext x='32' y='44' font-size='34' text-anchor='middle' fill='white'%3E游%3C/text%3E%3C/svg%3E">
+<!-- 每周复用说明：
+  1. 本文件即每周看板布局模板（SKILL 交付基线），不要改动 CSS/JS 壳；
+  2. 每周用 scripts/build_dashboard.py 注入本周 games.json 生成最终 HTML：
+       python scripts/build_dashboard.py <games.json> <输出.html>
+  3. 生成后仍需人工更新的两处内容（本模板中已留占位）：
+     a) __WEEK_LABEL__（标题周次，也可在生成后用 -t 参数指定）
+     b) 「灵感总结」「观察项」两个内容区块（占位段落替换为本周内容）；
+  4. 素材放输出目录下 assets/：<游戏id>_icon.<ext>（列表/详情头像）与 <游戏id>_shot1.<ext>（画廊首图）；
+     缺素材的游戏自动回退为渐变字块，不会裂图。
+-->
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+  :root{
+    --bg:#f4f6f9; --card:#ffffff; --line:#e5e9f0; --ink:#1f2937; --sub:#6b7280;
+    --acc:#2563eb; --acc-soft:#eff4ff; --gold:#d97706; --green:#059669; --danger:#dc2626;
+    --radius:12px; --shadow:0 1px 3px rgba(15,23,42,.08),0 4px 14px rgba(15,23,42,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);line-height:1.55}
+  .wrap{max-width:1280px;margin:0 auto;padding:16px}
+  header.app{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+  header.app h1{font-size:20px;font-weight:700}
+  header.app .sub{color:var(--sub);font-size:13px}
+  .tabs{display:flex;gap:8px;margin-left:auto}
+  .tabs button{border:1px solid var(--line);background:#fff;color:var(--ink);padding:10px 18px;border-radius:999px;cursor:pointer;font-size:14px;transition:.15s;min-height:44px;display:flex;align-items:center}
+  .tabs button.active{background:var(--acc);border-color:var(--acc);color:#fff}
+  section.view{display:none}
+  section.view.active{display:block}
+  /* ---------- 汇总看板 ---------- */
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)}
+  .kpi .k{color:var(--sub);font-size:12px;margin-bottom:4px}
+  .kpi .v{font-size:24px;font-weight:700}
+  .kpi .v small{font-size:13px;color:var(--sub);font-weight:400}
+  .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+  .chart-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px;box-shadow:var(--shadow)}
+  .chart-card h3{font-size:14px;margin-bottom:8px}
+  .chart-card .box{width:100%;height:280px}
+  .quick-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-bottom:16px}
+  .qc{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px;cursor:pointer;box-shadow:var(--shadow);transition:.15s;display:flex;gap:12px;align-items:center}
+  .qc:hover{border-color:var(--acc);transform:translateY(-2px)}
+  .qc .thumb{width:52px;height:52px;border-radius:10px;overflow:hidden;flex:none;background:#eef1f5}
+  .qc .thumb img{width:100%;height:100%;object-fit:cover}
+  .qc .meta{min-width:0;flex:1}
+  .qc .meta .nm{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .qc .meta .ol{color:var(--sub);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .qc .sc{margin-left:auto;text-align:right;flex:none}
+  .qc .sc b{font-size:18px}
+  .qc .sc .iaa{color:var(--sub);font-size:11px}
+  .badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;line-height:1.7;background:var(--acc-soft);color:var(--acc)}
+  .badge.steam{background:#eef4ff;color:#2563eb}
+  .badge.gp{background:#eefbf4;color:#059669}
+  .badge.ios{background:#fdf2f7;color:#db2777}
+  .content-block{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);margin-bottom:16px}
+  .content-block h2{font-size:16px;margin-bottom:10px;padding-left:10px;border-left:4px solid var(--acc)}
+  .content-block h3{font-size:14px;margin:10px 0 6px}
+  .content-block ul,.content-block ol{margin-left:20px}
+  .content-block li{margin:4px 0}
+  .content-block .tag{display:inline-block;background:var(--acc-soft);color:var(--acc);border-radius:6px;padding:1px 8px;font-size:12px;margin:2px 4px 2px 0}
+  /* ---------- 游戏图鉴 ---------- */
+  .detail-wrap{display:flex;gap:14px;align-items:flex-start}
+  .list-col{width:320px;flex:none;position:sticky;top:12px}
+  #game-list{display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 120px);overflow-y:auto;padding-right:4px}
+  .gl-item{display:flex;gap:10px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;transition:.15s;box-shadow:var(--shadow)}
+  .gl-item:hover{border-color:var(--acc)}
+  .gl-item.active{border-color:var(--acc);background:var(--acc-soft)}
+  .gl-item .thumb{width:44px;height:44px;border-radius:8px;overflow:hidden;flex:none;background:#eef1f5}
+  .gl-item .thumb img{width:100%;height:100%;object-fit:cover}
+  .gl-item .nm{font-weight:600;font-size:14px}
+  .gl-item .pf{color:var(--sub);font-size:11px}
+  .gl-item .rank{width:26px;height:26px;border-radius:50%;background:#eef1f5;color:var(--sub);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
+  .gl-item .rank.top1{background:#fef3c7;color:#92400e}
+  .gl-item .rank.top2{background:#e5e7eb;color:#374151}
+  .gl-item .rank.top3{background:#fde8d0;color:#9a3412}
+  .gl-item .score{margin-left:auto;font-weight:700;font-size:15px}
+  .detail-col{flex:1;min-width:0}
+  .hero{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);margin-bottom:14px}
+  .hero .banner{height:180px;background:linear-gradient(120deg,#dbeafe,#e0f2fe);display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .hero .banner img{width:100%;height:100%;object-fit:cover}
+  .hero .banner .tile{font-size:42px;font-weight:800;color:#1e40af}
+  .hero .body{padding:14px 16px}
+  .hero .body .h-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .hero .body h2{font-size:20px}
+  .hero .body .en{color:var(--sub);font-size:13px}
+  .hero .body .score{font-size:26px;font-weight:800;color:var(--acc);margin-left:auto}
+  .hero .body .score small{font-size:12px;color:var(--sub);font-weight:400}
+  .hero .body .intro{margin-top:8px;color:#374151;font-size:14px}
+  .gallery{display:flex;gap:10px;overflow-x:auto;padding:2px 0 10px;margin-bottom:14px}
+  .gallery img{width:280px;flex:none;border-radius:10px;border:1px solid var(--line);object-fit:cover;background:#eef1f5;max-height:180px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);margin-bottom:14px}
+  .panel h3{font-size:15px;margin-bottom:10px;padding-left:8px;border-left:4px solid var(--acc)}
+  .info-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 16px}
+  .info-grid .it .k{color:var(--sub);font-size:12px}
+  .info-grid .it .v{font-size:13px;word-break:break-word}
+  .dim-bar{margin:6px 0}
+  .dim-bar .lb{display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px}
+  .dim-bar .tr{height:8px;background:#eef1f5;border-radius:99px;overflow:hidden}
+  .dim-bar .tr i{display:block;height:100%;background:var(--acc);border-radius:99px}
+  .charts-duo{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .charts-duo .box{width:100%;height:300px}
+  .analysis h4{font-size:14px;margin:12px 0 4px;color:var(--acc)}
+  .analysis p,.analysis li{font-size:13.5px;color:#374151}
+  .analysis ul,.analysis ol{margin-left:20px}
+  .good li{color:#065f46}
+  .bad li{color:#9a3412}
+  .sources a{color:var(--acc);font-size:13px;margin-right:10px;word-break:break-all}
+  footer{color:var(--sub);font-size:12px;text-align:center;padding:20px 0 40px}
+  .tile{display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;background:linear-gradient(135deg,#93c5fd,#60a5fa)}
+  .tile.s{font-size:20px}
+  .tile.l{font-size:42px}
+  /* ---------- 手机竖屏适配（必须保留） ---------- */
+  @media (max-width:640px){
+    .wrap{padding:12px}
+    header.app h1{font-size:17px}
+    header.app .sub{font-size:14px}
+    .tabs{width:100%;margin-left:0;justify-content:center}
+    .kpi-row{grid-template-columns:repeat(2,1fr);gap:8px}
+    .kpi .k{font-size:14px}
+    .badge{font-size:14px}
+    .qc .meta .ol{font-size:14px}
+    .qc .sc .iaa{font-size:14px}
+    .qc .meta .nm{font-size:14px}
+    .charts-grid{grid-template-columns:1fr;gap:10px}
+    .chart-card .box{height:240px}
+    .detail-wrap{flex-direction:column}
+    .list-col{position:static;width:100%}
+    #game-list{flex-direction:row;overflow-x:auto;max-height:none;padding-bottom:6px;scroll-snap-type:x proximity}
+    .gl-item{min-width:196px;scroll-snap-align:start;flex:none}
+    .gl-item .rank{width:30px;height:30px;font-size:14px}
+    .gl-item .pf{font-size:14px}
+    .detail-col{width:100%}
+    .hero .banner{height:120px}
+    .charts-duo{grid-template-columns:1fr}
+    .charts-duo .box{height:260px}
+    .gallery img{width:72%}
+    .info-grid{grid-template-columns:1fr}
+    .info-grid .it .v{font-size:14px}
+    .info-grid .it .k{font-size:14px}
+    .hero .body .en{font-size:14px}
+    .dim-bar .lb{font-size:14px}
+    .analysis p,.analysis li{font-size:14px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="app">
+    <div>
+      <h1>游戏周榜观察 · __WEEK_LABEL__</h1>
+      <div class="sub">1-3 人小团队独立游戏灵感雷达 · 13 维打分（含 Steam 愿望单热度） · 分析师主观打分口径</div>
+    </div>
+    <div class="tabs">
+      <button id="tab-dash" class="active" onclick="switchView('dash')">汇总看板</button>
+      <button id="tab-gallery" onclick="switchView('gallery')">游戏图鉴</button>
+    </div>
+  </header>
+
+  <!-- ============ 汇总看板 ============ -->
+  <section id="view-dash" class="view active">
+    <div class="kpi-row" id="kpi-row"></div>
+    <div class="charts-grid">
+      <div class="chart-card"><h3>综合分排行（13 维方案 A）</h3><div id="chart-rank" class="box"></div></div>
+      <div class="chart-card"><h3>潜力定位 · 综合分 × IAA 潜力</h3><div id="chart-quad" class="box"></div></div>
+      <div class="chart-card"><h3>平台构成</h3><div id="chart-platform" class="box"></div></div>
+      <div class="chart-card"><h3>13 维均值雷达基准（全体均值）</h3><div id="chart-dimmean" class="box"></div></div>
+    </div>
+    <div class="content-block">
+      <h2>本周速览（点击卡片进入图鉴）</h2>
+      <div class="quick-cards" id="quick-cards"></div>
+    </div>
+    <div class="content-block">
+      <h2>灵感总结</h2>
+      <!-- 每周更新：用 build_dashboard.py --insights <fragment.html> 注入本周内容（含共性趋势/切入方向/别碰的坑 三个 h3 小节） -->
+      __WEEKLY_INSIGHTS__
+    </div>
+    <div class="content-block">
+      <h2>观察项清单</h2>
+      <!-- 每周更新：用 build_dashboard.py --watchlist <fragment.html> 注入本周观察项 -->
+      __WEEKLY_WATCHLIST__
+    </div>
+  </section>
+
+  <!-- ============ 游戏图鉴 ============ -->
+  <section id="view-gallery" class="view">
+    <div class="detail-wrap">
+      <div class="list-col">
+        <div id="game-list"></div>
+      </div>
+      <div class="detail-col" id="detail-col"></div>
+    </div>
+  </section>
+
+  <footer>数据口径：时间窗口=最近 7 天新进榜/上升≥30 名；环比无上周快照标「待核实」；下载/收入为估算口径；评分评论为 2026-10-10 快照；愿望单为第三方估算信号（statswell 粉丝数×系数/开发者披露），非官方数据；13 维打分为分析师主观判断。详见各游戏「来源」。</footer>
+</div>
+
+<!-- 素材预载（发布链路静态扫描只认 <img src> 与 CSS url()；此处由构建脚本按 assets/ 实存文件静态列出，防动态路径漏传裂图） -->
+<div style="display:none" id="preload">__PRELOAD_IMGS__</div>
+
+<script>
+/* ==================== 每周数据（由 build_dashboard.py 注入） ==================== */
+const GAMES = __GAMES_DATA__;
+
+const DIM_NAMES = ["玩法创新性","核心循环完整度","美术可复刻性","技术门槛","内容量成本","IAA 改造潜力","IAP 付费友好度","上手门槛","题材市场热度","竞争烈度","小团队可借鉴度","上架合规风险","愿望单热度"];
+
+/* 素材回退：无图自动渐变字块（icon/shots 由构建脚本按 assets/ 实存清空，缺素材不再发起 <img> 请求） */
+function assetOf(g, kind){ // kind: icon | shot
+  if(kind==='icon') return g.icon || '';
+  return (g.shots && g.shots[0]) || '';
+}
+function imgTag(g, cls){
+  const f = assetOf(g,'icon');
+  if(!f) return '<div class="tile '+cls+'">'+g.zh[0]+'</div>';
+  return '<img src="'+f+'" alt="'+g.zh+'" onerror="this.outerHTML=\'<div class=\\\'tile '+cls+'\\\'>'+g.zh[0]+'</div>\'">';
+}
+function shotTag(g){
+  const f = assetOf(g,'shot');
+  if(!f) return '';
+  return '<img src="'+f+'" alt="'+g.zh+'" loading="lazy" onerror="this.remove()">';
+}
+function pfBadge(label){
+  const m = {'Steam':'steam','GP':'gp','iOS/GP':'ios','iOS':'ios'};
+  return '<span class="badge '+(m[label]||'')+'">'+label+'</span>';
+}
+
+/* ---------- 汇总看板：指标卡 ---------- */
+function renderKpi(){
+  const steamW = GAMES.filter(g=>g.platformLabel==='Steam');
+  const top = [...GAMES].sort((a,b)=>b.score-a.score)[0];
+  const meanScore = (GAMES.reduce((s,g)=>s+g.score,0)/GAMES.length).toFixed(2);
+  const kpi = [
+    {k:'收录游戏', v:GAMES.length, small:'款 · 三平台'},
+    {k:'最高综合分', v:top.score.toFixed(2), small:top.zh},
+    {k:'Steam 高愿望单', v:steamW.filter(g=>(g.dims[12]||0)>=7).length, small:'款（愿望单维度≥7）'},
+    {k:'全体均值', v:meanScore, small:'综合分'}
+  ];
+  document.getElementById('kpi-row').innerHTML = kpi.map(k=>'<div class="kpi"><div class="k">'+k.k+'</div><div class="v">'+k.v+' <small>'+k.small+'</small></div></div>').join('');
+}
+
+/* ---------- 汇总看板：速览卡 ---------- */
+function renderQuick(){
+  const sorted = [...GAMES].sort((a,b)=>a.rank-b.rank);
+  document.getElementById('quick-cards').innerHTML = sorted.map(g=>
+    '<div class="qc" onclick="goGame(\''+g.id+'\')">'+
+      '<div class="thumb">'+imgTag(g,'s')+'</div>'+
+      '<div class="meta"><div class="nm">#'+g.rank+' '+g.zh+'</div><div class="ol">'+g.oneLiner+'</div>'+
+      '<div>'+pfBadge(g.platformLabel)+' <span class="badge">IAA '+g.iaa+'</span> <span class="badge">愿望单 '+g.dims[12]+'</span></div></div>'+
+      '<div class="sc"><b>'+g.score.toFixed(2)+'</b><div class="iaa">综合分</div></div>'+
+    '</div>').join('');
+}
+
+/* ---------- 图鉴：左侧列表 ---------- */
+function renderList(){
+  const sorted = [...GAMES].sort((a,b)=>a.rank-b.rank);
+  document.getElementById('game-list').innerHTML = sorted.map(g=>
+    '<div class="gl-item" data-id="'+g.id+'" onclick="goGame(\''+g.id+'\')">'+
+      '<div class="rank top'+(g.rank<=3?g.rank:'')+'">'+g.rank+'</div>'+
+      '<div class="thumb">'+imgTag(g,'s')+'</div>'+
+      '<div><div class="nm">'+g.zh+'</div><div class="pf">'+g.en+'</div></div>'+
+      '<div class="score">'+g.score.toFixed(2)+'</div>'+
+    '</div>').join('');
+}
+
+/* ---------- 图鉴：右侧详情 ---------- */
+function renderDetail(id){
+  const g = GAMES.find(x=>x.id===id); if(!g) return;
+  const dimBars = g.dims.map((v,i)=>
+    '<div class="dim-bar"><div class="lb"><span>'+DIM_NAMES[i]+'</span><span>'+v+'</span></div><div class="tr"><i style="width:'+v*10+'%"></i></div></div>').join('');
+  const good = g.good.map(x=>'<li>'+x+'</li>').join('');
+  const bad = g.bad.map(x=>'<li>'+x+'</li>').join('');
+  const tips = g.tips.map(x=>'<li>'+x+'</li>').join('');
+  const notes = g.notes.map(x=>'<li>'+x+'</li>').join('');
+  const urls = g.urls.map(u=>'<a href="'+u+'" target="_blank" rel="noopener">'+u+'</a>').join('');
+  const shots = (g.shots&&g.shots.length?g.shots:[assetOf(g,'shot')]).map(()=>shotTag(g)).join('');
+  document.getElementById('detail-col').innerHTML =
+    '<div class="hero"><div class="banner">'+imgTag(g,'l')+'</div>'+
+      '<div class="body"><div class="h-row">'+
+        '<h2>'+g.zh+'</h2><span class="en">'+g.en+'</span>'+pfBadge(g.platformLabel)+
+        '<div class="score">'+g.score.toFixed(2)+'<small> 综合分</small></div></div>'+
+        '<div class="intro">'+g.intro+'</div></div></div>'+
+    '<div class="gallery">'+shots+'</div>'+
+    '<div class="panel"><h3>基础信息</h3><div class="info-grid">'+
+      '<div class="it"><div class="k">开发 / 发行</div><div class="v">'+g.dev+' / '+g.pub+'</div></div>'+
+      '<div class="it"><div class="k">类型</div><div class="v">'+g.type+'</div></div>'+
+      '<div class="it"><div class="k">上架</div><div class="v">'+g.launch+'</div></div>'+
+      '<div class="it"><div class="k">排名</div><div class="v">'+g.rankNow+'</div></div>'+
+      '<div class="it"><div class="k">下载量（估算）</div><div class="v">'+g.downloads+'</div></div>'+
+      '<div class="it"><div class="k">收入（估算）</div><div class="v">'+g.revenue+'</div></div>'+
+      '<div class="it"><div class="k">评分与评论</div><div class="v">'+g.rating+'</div></div>'+
+      '<div class="it"><div class="k">变现模式</div><div class="v">'+g.monet+'</div></div>'+
+      '<div class="it"><div class="k">愿望单热度</div><div class="v">'+g.wishlist+'</div></div>'+
+      '<div class="it"><div class="k">愿望单口径</div><div class="v">'+g.wishlistNote+'</div></div>'+
+    '</div></div>'+
+    '<div class="panel"><h3>13 维打分（'+(g.score)+' 综合分 · IAA '+g.iaa+'）</h3><div class="charts-duo">'+
+      '<div class="box" id="chart-bar"></div><div class="box" id="chart-radar"></div></div>'+
+      '<div style="margin-top:10px">'+dimBars+'</div></div>'+
+    '<div class="panel analysis"><h3>深度分析</h3>'+
+      '<h4>一句话定位</h4><p>'+g.oneLiner+'</p>'+
+      '<h4>玩法亮点</h4><p>'+g.coreLoop+'</p>'+
+      '<h4>核心卖点</h4><p>'+g.selling+'</p>'+
+      '<h4>资源循环方式</h4><p>'+g.resources+'</p>'+
+      '<h4>变现设计</h4><p>'+g.monetDetail+'</p>'+
+      '<h4>用户口碑洞察</h4><ul class="good">'+good+'</ul><ul class="bad">'+bad+'</ul>'+
+      '<h4>独立开发者借鉴建议</h4><ol>'+tips+'</ol>'+
+      '<h4>注意事项</h4><ul>'+notes+'</ul>'+
+      '<h4>来源</h4><div class="sources">'+urls+'</div></div>';
+  drawDetailCharts(g);
+}
+
+/* ---------- ECharts ---------- */
+function drawDashCharts(){
+  const sorted = [...GAMES].sort((a,b)=>a.score-b.score);
+  const names = sorted.map(g=>g.zh);
+  echarts.init(document.getElementById('chart-rank')).setOption({
+    grid:{left:90,right:40,top:10,bottom:24},tooltip:{trigger:'axis',axisPointer:{type:'shadow'}},
+    xAxis:{type:'value',max:10,splitLine:{lineStyle:{color:'#eef1f5'}}},
+    yAxis:{type:'category',data:names,inverse:true,axisLine:{show:false},axisTick:{show:false}},
+    series:[{type:'bar',data:sorted.map(g=>g.score),itemStyle:{color:'#2563eb',borderRadius:[0,6,6,0]},label:{show:true,position:'right',formatter:p=>p.value.toFixed(2)}}]
+  });
+  const xs=[],ys=[],nm=[],cols=[];
+  GAMES.forEach(g=>{xs.push(g.score);ys.push(g.iaa);nm.push(g.zh);cols.push('#2563eb');});
+  const mx=GAMES.reduce((s,g)=>s+g.score,0)/GAMES.length, my=GAMES.reduce((s,g)=>s+g.iaa,0)/GAMES.length;
+  echarts.init(document.getElementById('chart-quad')).setOption({
+    grid:{left:46,right:20,top:30,bottom:34},tooltip:{formatter:p=>nm[p.dataIndex]+'<br>综合分 '+xs[p.dataIndex]+' · IAA '+ys[p.dataIndex]},
+    xAxis:{type:'value',name:'综合分',min:5.5,max:7.8,axisLabel:{formatter:v=>v.toFixed(1)}},
+    yAxis:{type:'value',name:'IAA',min:0,max:10},
+    series:[{type:'scatter',symbolSize:34,data:xs.map((x,i)=>[x,ys[i]]),itemStyle:{color:'#2563eb'},label:{show:true,formatter:p=>nm[p.dataIndex],position:'top',fontSize:11}},
+      {type:'markLine',silent:true,symbol:'none',data:[{xAxis:mx},{yAxis:my}],lineStyle:{type:'dashed',color:'#9ca3af'}}]
+  });
+  const plat={};GAMES.forEach(g=>{const k=g.platformLabel==='iOS+GP'?'iOS+GP':g.platformLabel;plat[k]=(plat[k]||0)+1;});
+  echarts.init(document.getElementById('chart-platform')).setOption({
+    tooltip:{trigger:'item',formatter:'{b}: {c} 款 ({d}%)'},
+    series:[{type:'pie',radius:['46%','72%'],data:Object.entries(plat).map(([n,v])=>({name:n,value:v})),label:{formatter:'{b} {c}'},color:['#2563eb','#059669','#db2777']}]
+  });
+  const means=DIM_NAMES.map((_,i)=>(GAMES.reduce((s,g)=>s+g.dims[i],0)/GAMES.length));
+  echarts.init(document.getElementById('chart-dimmean')).setOption({
+    grid:{left:120,right:40,top:8,bottom:20},tooltip:{trigger:'axis',axisPointer:{type:'shadow'}},
+    xAxis:{type:'value',max:10,splitLine:{lineStyle:{color:'#eef1f5'}}},
+    yAxis:{type:'category',data:DIM_NAMES,inverse:true,axisLine:{show:false},axisTick:{show:false}},
+    series:[{type:'bar',data:means.map(v=>+v.toFixed(2)),itemStyle:{color:'#059669',borderRadius:[0,6,6,0]},label:{show:true,position:'right',formatter:p=>p.value.toFixed(2)}}]
+  });
+}
+function drawDetailCharts(g){
+  const el1=document.getElementById('chart-bar'),el2=document.getElementById('chart-radar');
+  if(!el1||!el2)return;
+  echarts.init(el1).setOption({
+    grid:{left:110,right:30,top:8,bottom:20},tooltip:{trigger:'axis',axisPointer:{type:'shadow'}},
+    xAxis:{type:'value',max:10,splitLine:{lineStyle:{color:'#eef1f5'}}},
+    yAxis:{type:'category',data:DIM_NAMES,inverse:true,axisLine:{show:false},axisTick:{show:false}},
+    series:[{type:'bar',data:g.dims,itemStyle:{color:'#2563eb',borderRadius:[0,5,5,0]},label:{show:true,position:'right'}}]
+  });
+  echarts.init(el2).setOption({
+    tooltip:{},radar:{indicator:DIM_NAMES.map(n=>({name:n,max:10})),radius:'66%',splitArea:{areaStyle:{color:['#f8fafc','#f1f5f9']}}},
+    series:[{type:'radar',data:[{value:g.dims,name:g.zh}],areaStyle:{color:'rgba(37,99,235,.18)'},lineStyle:{color:'#2563eb'},itemStyle:{color:'#2563eb'}}]
+  });
+}
+
+/* ---------- 路由与视图 ---------- */
+function switchView(v){
+  document.getElementById('view-dash').classList.toggle('active',v==='dash');
+  document.getElementById('view-gallery').classList.toggle('active',v==='gallery');
+  document.getElementById('tab-dash').classList.toggle('active',v==='dash');
+  document.getElementById('tab-gallery').classList.toggle('active',v==='gallery');
+  if(v==='gallery'){renderList();goGame(GAMES[0].id);}
+  if(v==='dash'){setTimeout(()=>{['chart-rank','chart-quad','chart-platform','chart-dimmean'].forEach(id=>{const el=document.getElementById(id);if(el){const c=echarts.getInstanceByDom(el);c&&c.resize();}});},60);}
+}
+function goGame(id){
+  renderDetail(id);
+  document.querySelectorAll('.gl-item').forEach(el=>el.classList.toggle('active',el.dataset.id===id));
+  if(window.innerWidth<=640) window.scrollTo(0,0); // 手机切游戏回到顶部
+}
+
+/* 预载素材（静态块由构建脚本注入，运行时不再动态拼接路径） */
+(function(){})();
+
+renderKpi();renderQuick();renderList();
+drawDashCharts();
+goGame(GAMES[0].id);
+</script>
+</body>
+</html>

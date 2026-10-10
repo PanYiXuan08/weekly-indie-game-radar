@@ -50,7 +50,7 @@ description: 每周独立游戏/休闲游戏榜单调研与可视化交付。当
 ## 阶段 5 · 交付
 
 按 `references/delivery.md` 依次产出：
-1. **交互看板**（复用上周看板为模板，更新 GAMES 数据与素材）→ html skill 自检（shot.py，desktop + mobile）→ lark-apps `+deploy` 发布到既有 app_id → 轮询 `+release-get` 到 finished。
+1. **交互看板**（固定布局：用仓库 `templates/dashboard-template.html` + `scripts/build_dashboard.py` 注入本期 GAMES 与每周内容，禁止手改壳）→ html skill 自检（shot.py，desktop + mobile 全项清零）→ lark-apps `+deploy` 发布到既有 app_id → 轮询 `+release-get` 到 finished。
 2. **飞书分享文档**（lark-doc 创建/更新工作流）→ 文档标题「游戏周榜观察 · YYYY-MM-DD（交互看板分享）」，内含看板入口、Top5 速览、讨论问题与数据口径声明。
 3. 通过 `present_files` 交付，最终回复 ≤300 字/8 行。
 
