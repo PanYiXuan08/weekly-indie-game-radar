@@ -24,6 +24,19 @@
   - 注意 iTunes `search` 接口受 robots 限制，用 `lookup`；返回 `releaseDate / averageUserRating / userRatingCount`。
 - **Google Play（评分/评论数）**：商店页解析（页面含评分与评论数；AppBrain 可查安装量区间）。
 
+## Steam 愿望单数据源（2026-10-10 实测，第 13 维用）
+
+| 数据源 | 用途 | 入口/说明 |
+|---|---|---|
+| Steam 官方热门愿望单榜 | 未发售/发售初期高愿望单新品观察 | `https://store.steampowered.com/search/?category1=998&filter=popularwishlist&ndl=1`（web_fetch 实测可取） |
+| statswell | 单游戏愿望单/粉丝数估算 | 榜单 `https://statswell.com/steam/top-wishlisted`；单游戏页 `https://statswell.com/steam/game/<appid>`（实测可用，记录 Followers / Top Sellers 排名 / Est. Owners，标注快照日期） |
+| gaminganalytics.info | 愿望单趋势 | `gbwish_last`（general_search 可命中，作为交叉参考） |
+| 开发者披露 | 发售前愿望单实况 | 开发者访谈/媒体披露（如渔力全开发售前约 2500），标「开发者披露」 |
+
+- **估算口径**：愿望单 ≈ statswell 粉丝数 ×2-2.5 系数（或直接用其 Est. Owners 作上限参考），标注「估算」与快照日期；无数据写「待核实」。
+- 坑：SteamDB 反爬（web_fetch 报 link fetch error，勿强试）；gamedata.wtf 单游戏页已失效（勿重试）。
+- 移动端无 Steam 愿望单，第 13 维取中性 5 分并注明「不适用」。
+
 ## 商店页素材抓取定位（可复用，实测有效）
 
 - **GP 包名 → 详情页**：`https://play.google.com/store/apps/details?id=<package>&hl=en_US`。
