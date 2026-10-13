@@ -48,19 +48,29 @@ def main():
     assets_dir = deploy_dir / "assets"
     preload = []
     if assets_dir.exists():
+        names = {f.name for f in assets_dir.iterdir() if f.is_file()}
+        SUFFIX = ("webp", "jpg", "jpeg", "png")
+
+        def find(prefix):
+            for cand in sorted(names):
+                if cand.startswith(prefix) and cand.rsplit(".", 1)[-1].lower() in SUFFIX:
+                    return cand
+            return None
+
         for g in games:
             # 素材存在性注入：缺素材时清空 icon/shots，模板直接渲染渐变字块，
             # 避免运行时 <img> 404（shot.py 会把这类失败记为 consoleErrors/resourceErrors）。
-            has_icon = any(f.name.startswith(f"{g['id']}_icon.") for f in assets_dir.iterdir())
-            has_shot = any(f.name.startswith(f"{g['id']}_shot1.") for f in assets_dir.iterdir())
-            if not has_icon:
+            # icon 兼容 _icon.* 与 _header.*（header 兜底），预载/清空均按实际文件名。
+            icon_f = find(f"{g['id']}_icon.") or find(f"{g['id']}_header.")
+            shot_f = find(f"{g['id']}_shot1.")
+            if not icon_f:
                 g["icon"] = ""
-            if not has_shot:
+            if not shot_f:
                 g["shots"] = []
-            if has_icon:
-                preload.append(f'<img src="assets/{g["id"]}_icon.jpg">')
-            if has_shot:
-                preload.append(f'<img src="assets/{g["id"]}_shot1.jpg">')
+            if icon_f:
+                preload.append(f'<img src="assets/{icon_f}">')
+            if shot_f:
+                preload.append(f'<img src="assets/{shot_f}">')
     html = (html.replace("__GAMES_DATA__", data_json)
                 .replace("__WEEK_LABEL__", args.week_label)
                 .replace("__PRELOAD_IMGS__", "\n    ".join(preload) or "<!-- 本周无本地素材 -->"))
