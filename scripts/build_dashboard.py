@@ -29,6 +29,7 @@ def main():
     ap.add_argument("--insights", help="本周「灵感总结」内容片段（HTML），替换模板 __WEEKLY_INSIGHTS__")
     ap.add_argument("--watchlist", help="本周「观察项清单」内容片段（HTML），替换模板 __WEEKLY_WATCHLIST__")
     args = ap.parse_args()
+    out = Path(args.output)
 
     template_path = Path(__file__).resolve().parent.parent / "templates" / "dashboard-template.html"
     if not template_path.exists():
@@ -59,7 +60,7 @@ def main():
 
         for g in games:
             # 素材存在性注入：缺素材时清空 icon/shots，模板直接渲染渐变字块，
-            # 避免运行时 <img> 404（shot.py 会把这类失败记为 consoleErrors/resourceErrors）。
+            # 避免运行时 <img> 404（自检工具会把这类失败记为 consoleErrors/resourceErrors）。
             # icon 兼容 _icon.* 与 _header.*（header 兜底），预载/清空均按实际文件名。
             icon_f = find(f"{g['id']}_icon.") or find(f"{g['id']}_header.")
             shot_f = find(f"{g['id']}_shot1.")
@@ -79,7 +80,6 @@ def main():
     if args.watchlist:
         html = html.replace("__WEEKLY_WATCHLIST__", Path(args.watchlist).read_text(encoding="utf-8").strip())
 
-    out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html, encoding="utf-8")
 

@@ -19,7 +19,7 @@
 - **Steam 评论（好评率/评论数）**：`https://store.steampowered.com/appreviews/<appid>?json=1&language=schinese&purchase_type=all`
   - 返回 `query_summary.total_positive / total_reviews`，好评率 = positive/reviews，可精确到小数点后一位。
 - **Steam 应用信息（上架日期/价格/开发商）**：`https://store.steampowered.com/api/appdetails?appids=<appid>&l=schinese`
-  - 用 web_fetch 可达；浏览器内 `bu.http_get` 对 Steam 易超时，改 web_fetch。
+  - 用通用网页抓取工具可达；浏览器内的 HTTP 请求对 Steam 易超时，改用服务端抓取工具。
 - **iOS（上架日期/评分/评论数）**：`https://itunes.apple.com/lookup?id=<苹果AppID>`
   - 注意 iTunes `search` 接口受 robots 限制，用 `lookup`；返回 `releaseDate / averageUserRating / userRatingCount`。
 - **Google Play（评分/评论数）**：商店页解析（页面含评分与评论数；AppBrain 可查安装量区间）。
@@ -28,13 +28,13 @@
 
 | 数据源 | 用途 | 入口/说明 |
 |---|---|---|
-| Steam 官方热门愿望单榜 | 未发售/发售初期高愿望单新品观察 | `https://store.steampowered.com/search/?category1=998&filter=popularwishlist&ndl=1`（web_fetch 实测可取） |
+| Steam 官方热门愿望单榜 | 未发售/发售初期高愿望单新品观察 | `https://store.steampowered.com/search/?category1=998&filter=popularwishlist&ndl=1`（实测可取） |
 | statswell | 单游戏愿望单/粉丝数估算 | 榜单 `https://statswell.com/steam/top-wishlisted`；单游戏页 `https://statswell.com/steam/game/<appid>`（实测可用，记录 Followers / Top Sellers 排名 / Est. Owners，标注快照日期） |
 | gaminganalytics.info | 愿望单趋势 | `gbwish_last`（general_search 可命中，作为交叉参考） |
 | 开发者披露 | 发售前愿望单实况 | 开发者访谈/媒体披露（如渔力全开发售前约 2500），标「开发者披露」 |
 
 - **估算口径**：愿望单 ≈ statswell 粉丝数 ×2-2.5 系数（或直接用其 Est. Owners 作上限参考），标注「估算」与快照日期；无数据写「待核实」。
-- 坑：SteamDB 反爬（web_fetch 报 link fetch error，勿强试）；gamedata.wtf 单游戏页已失效（勿重试）。
+- 坑：SteamDB 反爬（抓取报 link fetch error，勿强试）；gamedata.wtf 单游戏页已失效（勿重试）。
 - 移动端无 Steam 愿望单，第 13 维取中性 5 分并注明「不适用」。
 
 ## 商店页素材抓取定位（可复用，实测有效）
